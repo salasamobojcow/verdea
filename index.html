@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verdea · Prototipo navegable</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#e4e4e0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1c1c1a;font-size:14px}
+#app{width:390px;height:844px;max-height:100vh;background:#fff;border:2px solid #1c1c1a;border-radius:28px;display:flex;flex-direction:column;overflow:hidden;position:relative}
+@media(max-width:480px){body{background:#fff}#app{width:100%;height:100vh;border:0;border-radius:0}}
+main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.r{display:flex;align-items:center;gap:10px}.sp{justify-content:space-between}
+.ph{background:#e6e6e2;border:1.5px dashed #8d8d88;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#5c5c58;font-size:12px}
+.c{border:1.5px solid #b5b5b0;border-radius:12px;padding:12px;background:#fff;text-align:left;font:inherit;color:inherit;width:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #2f5bea;outline-offset:2px}
+h1,h2,p{margin:0}h2{font-size:16px;font-weight:600}.m{color:#5c5c58;font-size:12px}
+.in{height:44px;border:1.5px solid #b5b5b0;border-radius:12px;padding:0 14px;font:inherit;width:100%}
+.btn{height:48px;border-radius:12px;border:1.5px solid #1c1c1a;background:#1c1c1a;color:#fff;font-weight:600;font-size:15px;width:100%}
+.btn.s{background:#fff;color:#1c1c1a}
+.chip{border:1.5px solid #8d8d88;border-radius:99px;padding:2px 10px;font-size:11px;color:#3a3a37;background:#fff;display:inline-block}
+.back{border:1.5px solid #8d8d88;border-radius:99px;padding:10px 14px;background:#fff}
+.task{display:flex;align-items:center;gap:12px;cursor:pointer}
+.chk{width:22px;height:22px;border:1.5px solid #1c1c1a;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.done .t{text-decoration:line-through;color:#767672}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+nav{display:flex;border-top:1.5px solid #b5b5b0;height:72px;flex:none}
+nav button{flex:1;border:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;color:#5c5c58}
+nav button[aria-current=page]{color:#1c1c1a;font-weight:700}
+nav svg{width:22px;height:22px}
+#toast{position:absolute;left:20px;right:20px;bottom:88px;background:#1c1c1a;color:#fff;padding:12px 14px;border-radius:12px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
+#toast.on{opacity:1;transform:none}
+.view{width:220px;height:220px;border:1.5px dashed #8d8d88;border-radius:20px;display:flex;align-items:center;justify-content:center;background:#f4f4f2}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="screen" aria-live="polite"></main>
+  <div id="toast" role="status"></div>
+  <nav id="tabs" aria-label="Navegación principal"></nav>
+</div>
+<script>
+const plants=[
+ {n:"Monstera",s:"Monstera deliciosa",room:"Sala",need:true},
+ {n:"Ficus",s:"Ficus lyrata",room:"Balcón",need:false},
+ {n:"Pothos",s:"Epipremnum aureum",room:"Cocina",need:false},
+ {n:"Sansevieria",s:"Dracaena trifasciata",room:"Estudio",need:false}
+];
+const tasks=[
+ {t:"Regar Monstera",w:"Sala",h:"Mañana",d:false},
+ {t:"Rotar Ficus",w:"Balcón",h:"Tarde",d:false},
+ {t:"Abonar Pothos",w:"Cocina",h:"Noche",d:false}
+];
+let query="",found=false,toastTimer;
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const icon='<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="16" height="16" rx="4"/></svg>';
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("on"),2000)}
+function card(p,i){return `<button class="c" data-go="planta-${i}"><div class="ph" style="height:96px">IMG planta</div><div style="font-weight:600;margin-top:8px">${p.n}</div><span class="chip">${p.need?"Necesita riego":"Todo bien"}</span></button>`}
+const views={
+ inicio(){
+  const list=plants.map((p,i)=>({p,i})).filter(x=>x.p.n.toLowerCase().includes(query.toLowerCase()));
+  const pend=tasks.filter(t=>!t.d).length;
+  return `<div class="r sp"><div><div class="m">Buenos días</div><h1 style="font-size:20px">Hola, Estudiante</h1></div><div class="ph" style="width:44px;height:44px;border-radius:50%">IMG</div></div>
+  <input class="in" id="q" aria-label="Buscar plantas" placeholder="Buscar en mis plantas" value="${esc(query)}">
+  <div class="r sp"><h2>Tareas de hoy · ${pend} pendientes</h2></div>
+  ${tasks.map((t,i)=>`<div class="c task ${t.d?"done":""}" role="checkbox" aria-checked="${t.d}" tabindex="0" data-task="${i}"><div class="chk">${t.d?"✓":""}</div><div style="flex:1"><div class="t" style="font-weight:500">${t.t}</div><div class="m">${t.w}</div></div><span class="m">${t.h}</span></div>`).join("")}
+  <div class="r sp"><h2>Mis plantas</h2><button class="m" style="border:0;background:none;text-decoration:underline" data-go="plantas">Ver todas</button></div>
+  <div class="grid">${list.slice(0,2).map(x=>card(x.p,x.i)).join("")||'<p class="m">No hay plantas con ese nombre.</p>'}</div>`},
+ plantas(){return `<h1 style="font-size:20px">Mis plantas</h1><div class="grid">${plants.map(card).join("")}</div>`},
+ planta(i){const p=plants[i];return `<div class="r sp"><button class="back" data-go="inicio">← Atrás</button><span class="chip" style="padding:8px 14px">Editar</span></div>
+  <div class="ph" style="height:200px">IMG principal de la planta</div>
+  <div><h1 style="font-size:22px">${p.n}</h1><div class="m">${p.s} · ${p.room}</div></div>
+  <div class="stats"><div class="c"><div class="m">Riego</div><b>[DATO]</b></div><div class="c"><div class="m">Luz</div><b>[DATO]</b></div><div class="c"><div class="m">Humedad</div><b>[DATO]</b></div></div>
+  <h2>Próximos cuidados</h2>
+  <div class="c r sp"><div>Regar<div class="m">${p.need?"Hoy":"Próxima fecha [FECHA]"}</div></div><span class="chip">Recordatorio</span></div>
+  <div class="c r sp"><div>Abonar<div class="m">Próxima fecha [FECHA]</div></div><span class="chip">Recordatorio</span></div>
+  <button class="btn" data-water="${i}">Registrar riego</button>
+  <button class="btn s" data-note>Ver historial y notas</button>`},
+ escanear(){return `<div class="r sp"><button class="back" data-go="inicio">← Atrás</button><h2>Agregar planta</h2><span style="width:70px"></span></div>
+  <div class="ph" style="height:330px;flex-direction:column;gap:10px"><div class="view">Encuadre</div>Apunta a las hojas de tu planta</div>
+  <button class="btn" data-shot>Tomar foto</button>
+  <div class="r sp m"><span>Galería</span><span>Flash</span></div>
+  <input class="in" id="byname" aria-label="Buscar por nombre" placeholder="Buscar por nombre">
+  ${found?`<div class="c"><b>Coincidencias</b><div class="m" style="margin-top:6px">1. Monstera deliciosa<br>2. Philodendron bipinnatifidum</div></div>`:'<p class="m">Los resultados de identificación aparecen aquí.</p>'}`},
+ perfil(){return `<h1 style="font-size:20px">Perfil</h1><div class="ph" style="height:120px">Pantalla por diseñar</div><p class="m">Esta sección no forma parte del wireframe inicial.</p>`}
+};
+function route(){
+  const h=(location.hash||"#inicio").slice(1);
+  const [name,arg]=h.split("-");
+  const key=views[name]?name:"inicio";
+  $("#screen").innerHTML=views[key](+arg||0);
+  $("#screen").scrollTop=0;
+  const tab=key==="planta"?"plantas":key;
+  $("#tabs").innerHTML=[["inicio","Inicio"],["plantas","Plantas"],["escanear","Escanear"],["perfil","Perfil"]]
+   .map(([k,l])=>`<button data-go="${k}" ${k===tab?'aria-current="page"':""}>${icon}${l}</button>`).join("");
+}
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-go]");
+  if(g){location.hash=g.dataset.go;return}
+  const t=e.target.closest("[data-task]");
+  if(t){const k=tasks[+t.dataset.task];k.d=!k.d;route();return}
+  const w=e.target.closest("[data-water]");
+  if(w){plants[+w.dataset.water].need=false;toast("Riego registrado");route();return}
+  if(e.target.closest("[data-shot]")){found=true;route();toast("Foto analizada");return}
+  if(e.target.closest("[data-note]"))toast("Historial: pantalla pendiente de diseño");
+});
+document.addEventListener("keydown",e=>{
+  if((e.key===" "||e.key==="Enter")&&e.target.dataset&&e.target.dataset.task!==undefined){e.preventDefault();e.target.click()}
+});
+document.addEventListener("input",e=>{
+  if(e.target.id==="q"){query=e.target.value;const pos=e.target.selectionStart;route();const q=$("#q");q.focus();q.setSelectionRange(pos,pos)}
+});
+window.addEventListener("hashchange",route);
+route();
+</script>
+</body>
+</html>
